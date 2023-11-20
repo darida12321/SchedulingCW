@@ -46,6 +46,7 @@ def getDueDates():
 def getProcessingTimes(vii=14, blur=5, night=18, onnx=3, emboss=2, muse=10, wave=6):
     return np.array([onnx, muse, emboss, emboss, blur, emboss, vii, blur, wave, blur, blur, emboss, onnx, onnx, blur, wave, wave, wave, emboss, onnx, emboss, onnx, vii, blur, night, muse, emboss, onnx, wave, emboss, muse])
 
+
 # Transitive closure for a graph
 def transitiveClosure(G):
     n = len(G)
@@ -60,7 +61,7 @@ def transitiveClosure(G):
 
 
 # TABU function
-def tabu(x0, L, gamma, K, getG, checkNeighborCorrectness):
+def tabu(x0, L, gamma, K, getG, checkNeighborCorrectness, logs=False):
     x = x0
     T = []
     gBest = getG(x0)
@@ -89,8 +90,10 @@ def tabu(x0, L, gamma, K, getG, checkNeighborCorrectness):
         while (len(T) > L):
             T.pop()
 
+        if logs:
+            print("Iteration: ", k, ", Tardiness: ", getG(y), ", Solution:", y)
+
         x = y
-        print("Iteration: ", k, ", Tardiness: ", getG(y), ", Solution:", x)
         if gBest >= getG(y):
             gBest = getG(y)
             xBest = y
@@ -118,20 +121,27 @@ def checkNeighborCorrectnessTC(G):
 
 
 D = getDueDates()
-P = getProcessingTimes()
+P = getProcessingTimes(13.7726, 5.5909, 18.0952, 2.7755, 1.5563, 9.7140, 5.6365)
 G = getDependencies()
 
 
 x0 = np.array([30, 29, 23, 10, 9, 14, 13, 12, 4, 20, 22, 3, 27, 28,
               8, 7, 19, 21, 26, 18, 25, 17, 15, 6, 24, 16, 5, 11, 2, 1, 31])
 
-
-L = 5
-gamma = 1
 K = 300
 
+print('Different parameters:')
+for gamma in [1, 5, 10, 20]:
+    for L in [5, 10, 20, 30]:
+        x = tabu(x0, L, gamma, K, getTardiness(P,D), checkNeighborCorrectnessTC(transitiveClosure(G)))
+        print("Gamma: ", gamma, ", L: ", L, ", Tardiness: ", getTardiness(P,D)(x))
+
+print('Best parameters')
+L = 5
+gamma = 1
+
 x = tabu(x0, L, gamma, K, getTardiness(P, D),
-         checkNeighborCorrectnessTC(transitiveClosure(G)))
+         checkNeighborCorrectnessTC(transitiveClosure(G)), logs=True)
 print('-----')
 print('Initial job order:', x0)
 print('Initial tardiness:', getTardiness(P, D)(x0))
