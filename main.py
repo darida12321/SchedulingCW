@@ -1,8 +1,6 @@
 import numpy as np
 
 # Problem definition
-
-
 def getDependencies():
     G = np.zeros((31, 31))
     G[0, 30] = 1
@@ -43,12 +41,8 @@ def getDependencies():
     G[28, 26] = 1
     G[29, 28] = 1
     return G
-
-
 def getDueDates():
     return np.array([172, 82, 18, 61, 93, 71, 217, 295, 290, 287, 253, 307, 279, 73, 355, 34, 233, 77, 88, 122, 71, 181, 340, 141, 209, 217, 256, 144, 307, 329, 269])
-
-
 def getProcessingTimes(vii=14, blur=5, night=18, onnx=3, emboss=2, muse=10, wave=6):
     return np.array([onnx, muse, emboss, emboss, blur, emboss, vii, blur, wave, blur, blur, emboss, onnx, onnx, blur, wave, wave, wave, emboss, onnx, emboss, onnx, vii, blur, night, muse, emboss, onnx, wave, emboss, muse])
 
@@ -64,40 +58,74 @@ def transitiveClosure(G):
                 reach[i][j] = reach[i][j] or (reach[i][k] and reach[k][j])
     return reach
 
+# Alternative version of vns, with multiple neighbor selections
+# # VNS function
+# def vns(x0, I, K, getG, getNeigborhood):
+#     x = x0
+#     g = getG(x)
+#     for k in range(K):
+#         print(f'Iteration {k}, Tardiness: {getG(x)}, Job order: {x}')
+#         for i in range(1, I+1):
+#             maxSwaps = 0
+#             y = x
+#             for _ in range(3):
+#                 swaps, schedule = getNeigborhood(np.copy(x), i)
+#                 if swaps >= maxSwaps:
+#                     swaps = maxSwaps
+#                     y = schedule
+#             delta = g-getG(y)
+#             if delta > 0:
+#                 x = y
+#                 g = getG(x)
+#                 break
+#     return x
 
-# TABU function
-def tabu(x0, L, gamma, K, getG, checkNeighborCorrectness):
+# # Produce a function for TABU that check if a neighbor is valid
+# def getRandomNeighborTC(G):
+#     def getRandomNeighbor(x, i):
+#         swaps = np.random.randint(1, i+1)
+#         for swap in range(swaps):
+#             indices = np.arange(len(x)-2)
+#             while True:
+#                 index = np.random.choice(indices)
+#                 indices = np.delete(indices, np.where(indices == index))
+#                 if G[x[index]-1, x[index+1]-1] == 1:
+#                     continue
+#                 x[index], x[index+1] = x[index+1], x[index]
+#                 break
+#         return swaps, x
+#     return getRandomNeighbor    
+
+# VNS function
+def vns(x0, I, K, getG, getNeigborhood):
     x = x0
-    T = []
-    gBest = getG(x0)
-    currentNeighbor = 0
+    g = getG(x)
     for k in range(K):
-        finished = False
-        iteration = 0
-        while iteration < len(x0) and not finished:
-            iteration += 1
-            i, j = currentNeighbor, currentNeighbor+1
-            currentNeighbor = (currentNeighbor+1) % (len(x0)-1)
-            if not checkNeighborCorrectness(x, i):
-                continue
-
-            y = x.copy()
-            y[i], y[j] = y[j], y[i]
-            delta = getG(x)-getG(y)
-            finished = (delta > -gamma and ((i, j) not in T)
-                        ) or getG(y) < gBest
-
-        if iteration >= len(x0):
-            break
-
-        T.append((i, j))
-        while (len(T) > L):
-            T.pop()
-
-        x = y
-        print("Iteration: ", k, ", Tardiness: ", getG(y), ", Solution:", x)
-        gBest = min(gBest, getG(y))
+        print(f'Iteration {k}, Tardiness: {getG(x)}, Job order: {x}')
+        for i in range(1, I+1):
+            y = getNeigborhood(np.copy(x), i)
+            delta = g-getG(y)
+            if delta > 0:
+                x = y
+                g = getG(x)
+                break
     return x
+
+# Produce a function for TABU that check if a neighbor is valid
+def getRandomNeighborTC(G):
+    def getRandomNeighbor(x, i):
+        swaps = np.random.randint(1, i+1)
+        for swap in range(swaps):
+            indices = np.arange(len(x)-2)
+            while True:
+                index = np.random.choice(indices)
+                indices = np.delete(indices, np.where(indices == index))
+                if G[x[index]-1, x[index+1]-1] == 1:
+                    continue
+                x[index], x[index+1] = x[index+1], x[index]
+                break
+        return x
+    return getRandomNeighbor    
 
 
 # Produce a function for TABU that gets the tardiness
@@ -111,34 +139,17 @@ def getTardiness(P, D):
         return tardiness
     return getG
 
-# Produce a function for TABU that check if a neighbor is valid
-
-
-def checkNeighborCorrectnessTC(G):
-    def checkNeighborCorrectness(x, i):
-        return G[x[i]-1, x[i+1]-1] == 0
-    return checkNeighborCorrectness
-
-
-
 
 D = getDueDates()
-P = getProcessingTimes(14.5034, 5.4685, 18.4080,
-                       2.7495, 1.6594, 10.3433, 6.3969)
-#P = getProcessingTimes()
+P = getProcessingTimes()
 G = getDependencies()
-
-
 x0 = np.array([30, 29, 23, 10, 9, 14, 13, 12, 4, 20, 22, 3, 27, 28,
               8, 7, 19, 21, 26, 18, 25, 17, 15, 6, 24, 16, 5, 11, 2, 1, 31])
 
+K = 3000
 
-L = 5
-gamma = 1
-K = 300
-
-x = tabu(x0, L, gamma, K, getTardiness(P, D),
-         checkNeighborCorrectnessTC(transitiveClosure(G)))
+x = vns(x0, 30, K, getTardiness(P, D),
+         getRandomNeighborTC(transitiveClosure(G)))
 print('-----')
 print('Initial job order:', x0)
 print('Initial tardiness:', getTardiness(P, D)(x0))
